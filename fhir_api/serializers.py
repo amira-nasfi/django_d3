@@ -4,6 +4,8 @@ from fhir.resources.patient import Patient as FHIRPatient
 from fhir.resources.observation import Observation as FHIRObservation
 
 
+# Patient Serializer
+
 class PatientFHIRSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -18,12 +20,11 @@ class PatientFHIRSerializer(serializers.ModelSerializer):
         ]
 
     def to_representation(self, instance):
-
         fhir_data = {
             "resourceType": "Patient",
             "id": str(instance.id),
             "identifier": [{
-                "system": "https://hospital.local/identifiers",
+                "system": "https://hopital.fr/identifiers",
                 "value": str(instance.identifier)
             }],
             "name": [{
@@ -39,26 +40,28 @@ class PatientFHIRSerializer(serializers.ModelSerializer):
 
         try:
             return FHIRPatient(**fhir_data).dict()
-        except Exception:
+        except:
             return fhir_data
 
     def to_internal_value(self, data):
 
-        if data.get("resourceType") != "Patient":
+        if data.get('resourceType') != 'Patient':
             raise serializers.ValidationError({
                 "resourceType": "Doit être 'Patient'"
             })
 
         internal_data = {
-            "identifier": data["identifier"][0]["value"],
-            "family_name": data["name"][0]["family"],
-            "given_name": data["name"][0]["given"][0],
-            "gender": data.get("gender"),
-            "birth_date": data.get("birthDate"),
+            "identifier": data['identifier'][0]['value'] if data.get('identifier') else None,
+            "family_name": data['name'][0]['family'] if data.get('name') else None,
+            "given_name": data['name'][0]['given'][0] if data.get('name') else None,
+            "gender": data.get('gender'),
+            "birth_date": data.get('birthDate')
         }
 
         return super().to_internal_value(internal_data)
 
+
+# Observation Serializer
 
 class ObservationFHIRSerializer(serializers.ModelSerializer):
 
@@ -89,19 +92,20 @@ class ObservationFHIRSerializer(serializers.ModelSerializer):
             'height': '8302-2'
         }
 
-        fhir_data = {
+        return {
             "resourceType": "Observation",
             "id": str(instance.id),
             "status": "final",
             "code": {
                 "coding": [{
                     "system": "http://loinc.org",
-                    "code": loinc.get(instance.observation_type, "unknown"),
+                    "code": loinc.get(instance.observation_type, 'unknown'),
                     "display": instance.get_observation_type_display()
                 }]
             },
             "subject": {
-                "reference": f"Patient/{instance.patient.id}"
+                "reference": f"Patient/{instance.patient.id}",
+                "display": f"{instance.patient.family_name} {instance.patient.given_name}"
             },
             "effectiveDateTime": instance.effective_date.isoformat(),
             "valueQuantity": {
@@ -109,10 +113,6 @@ class ObservationFHIRSerializer(serializers.ModelSerializer):
                 "unit": instance.unit,
                 "system": "http://unitsofmeasure.org",
                 "code": instance.unit
-            }
+            },
+            "issued": instance.created_at.isoformat()
         }
-
-        try:
-            return FHIRObservation(**fhir_data).dict()
-        except Exception:
-            return fhir_data
